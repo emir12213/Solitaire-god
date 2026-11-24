@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f172a">
+    <title>Solitaire God Mode</title>
+    
+    <!-- Link ke Manifest PWA/APK -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.png">
+    
+    <!-- Font Modern ala Figma (Inter) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-gradient: radial-gradient(circle at top, #1e293b 0%, #090d16 100%);
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --accent-gold: #f59e0b;
+            --accent-glow: rgba(245, 158, 11, 0.4);
+            --card-red: #ff4757;
+            --card-black: #1e272e;
+            --card-bg: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: #f8fafc;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Top Navbar (Figma Header Style) */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 18px;
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 800;
+            font-size: 16px;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-god {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #000;
+            font-size: 10px;
+            padding: 2px 7px;
+            border-radius: 99px;
+            font-weight: 800;
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .stats {
+            display: flex;
+            gap: 14px;
+            font-size: 13px;
+            color: #94a3b8;
+            font-weight: 600;
+        }
+
+        .stats span b {
+            color: #fff;
+        }
+
+        /* Board Area */
+        main {
+            flex: 1;
+            padding: 14px;
+            max-width: 600px;
+            width: 100%;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .top-row {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+        }
+
+        .tableau {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+            flex: 1;
+        }
+
+        /* Slot & Card Design */
+        .slot {
+            aspect-ratio: 2.5 / 3.5;
+            background: var(--glass-bg);
+            border: 1.5px dashed var(--glass-border);
+            border-radius: 8px;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 18px;
+            color: rgba(255,255,255,0.15);
+            cursor: pointer;
+        }
+
+        .column {
+            position: relative;
+            min-height: 280px;
+        }
+
+        .card {
+            width: 100%;
+            aspect-ratio: 2.5 / 3.5;
+            background: var(--card-bg);
+            border-radius: 8px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            padding: 4px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            border: 1px solid #e2e8f0;
+        }
+
+        .card.red { color: var(--card-red); }
+        .card.black { color: var(--card-black); }
+
+        .card.selected {
+            transform: translateY(-6px) scale(1.04);
+            box-shadow: 0 0 0 2.5px var(--accent-gold), 0 10px 20px rgba(0,0,0,0.6);
+            z-index: 100 !important;
+        }
+
+        /* Kartu Tertutup */
+        .card.facedown {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            border: 1.5px solid rgba(255,255,255,0.3);
+        }
+
+        .card.facedown * {
+            opacity: 0;
+        }
+
+        /* Efek God Mode: X-Ray Vision */
+        body.xray-active .card.facedown {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(15, 23, 42, 0.85));
+            border: 1px solid var(--accent-gold);
+        }
+        body.xray-active .card.facedown * {
+            opacity: 0.75;
+            color: #fde047 !important;
+        }
+
+        .card-top {
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .card-center {
+            font-size: 20px;
+            align-self: center;
+        }
+
+        /* God Mode Floating Dock (Figma Bottom Bar) */
+        .god-dock {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            border-top: 1px solid var(--glass-border);
+            padding: 12px 14px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .god-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--accent-gold);
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .god-controls {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 6px;
+            max-width: 600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .btn-god {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: #fff;
+            padding: 10px 4px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s;
+        }
+
+        .btn-god:active {
+            transform: scale(0.95);
+        }
+
+        .btn-god.active {
+            background: rgba(245, 158, 11, 0.2);
+            border-color: var(--accent-gold);
+            color: var(--accent-gold);
+        }
+
+        .btn-god.win-btn {
+            background: linear-gradient(135deg, #f59e0b, #b45309);
+            border: none;
+            color: #000;
+            font-weight: 800;
+        }
+
+        /* Win Modal */
+        #winModal {
+            position: fixed;
+            inset: 0;
+            background: rgba(9, 13, 22, 0.9);
+            backdrop-filter: blur(10px);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #winModal h1 {
+            font-size: 32px;
+            background: linear-gradient(to right, #fde047, #f59e0b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+
+        #winModal p {
+            color: #94a3b8;
+            margin-bottom: 24px;
+        }
+
+        .btn-restart {
+            background: #f59e0b;
+            color: #000;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <span>SOLITAIRE</span>
+            <span class="badge-god">GOD MODE</span>
+        </div>
+        <div class="stats">
+            <span>Skor: <b id="score">0</b></span>
+            <span>Langkah: <b id="moves">0</b></span>
+        </div>
+    </header>
+
+    <main>
+        <!-- Baris Atas: Stock, Waste, Spacer, dan 4 Foundation -->
+        <div class="top-row">
+            <div class="slot" id="stock" onclick="drawCard()">↻</div>
+            <div class="slot" id="waste"></div>
+            <div></div>
+            <div class="slot foundation" data-suit="♠" onclick="clickFoundation(0)">♠</div>
+            <div class="slot foundation" data-suit="♥" onclick="clickFoundation(1)">♥</div>
+            <div class="slot foundation" data-suit="♣" onclick="clickFoundation(2)">♣</div>
+            <div class="slot foundation" data-suit="♦" onclick="clickFoundation(3)">♦</div>
+        </div>
+
+        <!-- 7 Kolom Kartu -->
+        <div class="tableau" id="tableau">
+            <div class="column" data-col="0"></div>
+            <div class="column" data-col="1"></div>
+            <div class="column" data-col="2"></div>
+            <div class="column" data-col="3"></div>
+            <div class="column" data-col="4"></div>
+            <div class="column" data-col="5"></div>
+            <div class="column" data-col="6"></div>
+        </div>
+    </main>
+
+    <!-- Panel Kontrol God Mode -->
+    <div class="god-dock">
+        <div class="god-label">⚡ God Mode Abilities</div>
+        <div class="god-controls">
+            <button class="btn-god" onclick="initGame()">
+                <span>🔄</span>New
+            </button>
+            <button class="btn-god" id="btnXray" onclick="toggleXray()">
+                <span>👁️</span>X-Ray
+            </button>
+            <button class="btn-god" onclick="godAutoMove()">
+                <span>🪄</span>Auto
+            </button>
+            <button class="btn-god" onclick="godShuffleHidden()">
+                <span>🎲</span>Shuffle
+            </button>
+            <button class="btn-god win-btn" onclick="godInstantWin()">
+                <span>👑</span>Win
+            </button>
+        </div>
+    </div>
+
+    <!-- Layar Kemenangan -->
+    <div id="winModal">
+        <h1>VICTORY!</h1>
+        <p>Kamu menaklukkan meja dengan kekuatan God Mode.</p>
+        <button class="btn-restart" onclick="initGame()">Main Lagi</button>
+    </div>
+
+    <!-- Registrasi Service Worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW terdaftar:', reg.scope))
+                    .catch(err => console.log('SW gagal:', err));
+            });
+        }
+    </script>
+
+    <!-- Logika Inti Game Solitaire + God Mode -->
+    <script>
+        const SUITS = ['♠', '♥', '♣', '♦'];
+        const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+        
+        let stock = [];
+        let waste = [];
+        let foundations = [[], [], [], []];
+        let tableau = [[], [], [], [], [], [], []];
+        let selected = null; // { source: 'waste'|'tableau', colIndex, cardIndex }
+        let score = 0;
+        let moves = 0;
+
+        function createDeck() {
+            let deck = [];
+            for (let s = 0; s < SUITS.length; s++) {
+                for (let v = 0; v < VALUES.length; v++) {
+                    deck.push({
+                        suit: SUITS[s],
+                        suitIndex: s,
+                        value: VALUES[v],
+                        rank: v + 1,
+                        color: (s === 1 || s === 3) ? 'red' : 'black',
+                        faceUp: false
+                    });
+                }
+            }
+            return deck.sort(() => Math.random() - 0.5);
+        }
+
+        function initGame() {
+            document.getElementById('winModal').style.display = 'none';
+            let deck = createDeck();
+            stock = [];
+            waste = [];
+            foundations = [[], [], [], []];
+            tableau = [[], [], [], [], [], [], []];
+            selected = null;
+            score = 0;
+            moves = 0;
+
+            for (let col = 0; col < 7; col++) {
+                for (let row = 0; row <= col; row++) {
+                    let card = deck.pop();
+                    if (row === col) card.faceUp = true;
+                    tableau[col].push(card);
+                }
+            }
+            stock = deck;
+            render();
+        }
+
+        function drawCard() {
+            selected = null;
+            if (stock.length > 0) {
+                let card = stock.pop();
+                card.faceUp = true;
+                waste.push(card);
+            } else {
+                while (waste.length > 0) {
+                    let card = waste.pop();
+                    card.faceUp = false;
+                    stock.push(card);
+                }
+            }
+            moves++;
+            render();
+        }
+
+        function createCardElement(card, isSelected) {
+            const el = document.createElement('div');
+            el.className = `card ${card.color} ${card.faceUp ? '' : 'facedown'} ${isSelected ? 'selected' : ''}`;
+            el.innerHTML = `
+                <div class="card-top">
+                    <span>${card.value}</span>
+                    <span>${card.suit}</span>
+                </div>
+                <div class="card-center">${card.suit}</div>
+            `;
+            return el;
+        }
+
+        function render() {
+            document.getElementById('score').innerText = score;
+            document.getElementById('moves').innerText = moves;
+
+            // Render Stock
+            const stockEl = document.getElementById('stock');
+            stockEl.innerHTML = stock.length > 0 ? `<div class="card facedown"></div>` : '↻';
+
+            // Render Waste
+            const wasteEl = document.getElementById('waste');
+            wasteEl.innerHTML = '';
+            if (waste.length > 0) {
+                const topWaste = waste[waste.length - 1];
+                const isSel = selected && selected.source === 'waste';
+                const cardEl = createCardElement(topWaste, isSel);
+                cardEl.onclick = (e) => {
+                    e.stopPropagation();
+                    if (isSel) {
+                        autoSendToFoundation(topWaste, 'waste');
+                    } else {
+                        selected = { source: 'waste' };
+                        render();
+                    }
+                };
+                wasteEl.appendChild(cardEl);
+            }
+
+            // Render Foundations
+            const foundEls = document.querySelectorAll('.foundation');
+            foundEls.forEach((el, idx) => {
+                el.innerHTML = SUITS[idx];
+                if (foundations[idx].length > 0) {
+                    const topCard = foundations[idx][foundations[idx].length - 1];
+                    el.innerHTML = '';
+                    el.appendChild(createCardElement(topCard, false));
+                }
+            });
+
+            // Render Tableau
+            const colEls = document.querySelectorAll('.column');
+            colEls.forEach((colEl, colIdx) => {
+                colEl.innerHTML = '';
+                colEl.onclick = () => clickEmptyColumn(colIdx);
+
+                tableau[colIdx].forEach((card, cardIdx) => {
+                    const isSel = selected && selected.source === 'tableau' && selected.colIndex === colIdx && cardIdx >= selected.cardIndex;
+                    const cardEl = createCardElement(card, isSel);
+                    cardEl.style.top = `${cardIdx * 24}px`;
+                    cardEl.style.zIndex = cardIdx + 1;
+
+                    cardEl.onclick = (e) => {
+                        e.stopPropagation();
+                        handleTableauClick(colIdx, cardIdx);
+                    };
+                    colEl.appendChild(cardEl);
+                });
+            });
+
+            checkWin();
+        }
+
+        function handleTableauClick(colIdx, cardIdx) {
+            const clickedCard = tableau[colIdx][cardIdx];
+            if (!clickedCard.faceUp) return;
+
+            if (!selected) {
+                selected = { source: 'tableau', colIndex: colIdx, cardIndex: cardIdx };
+                render();
+                return;
+            }
+
+            // Jika klik kartu yang sama, coba kirim otomatis ke Foundation
+            if (selected.source === 'tableau' && selected.colIndex === colIdx && selected.cardIndex === cardIdx) {
+                if (cardIdx === tableau[colIdx].length - 1) {
+                    autoSendToFoundation(clickedCard, 'tableau', colIdx);
+                }
+                selected = null;
+                render();
+                return;
+            }
+
+            // Coba pindahkan kartu yang dipilih ke kolom target
+            const movingCard = selected.source === 'waste' 
+                ? waste[waste.length - 1] 
+                : tableau[selected.colIndex][selected.cardIndex];
+
+            const targetTopCard = tableau[colIdx][tableau[colIdx].length - 1];
+
+            if (movingCard.color !== targetTopCard.color && movingCard.rank === targetTopCard.rank - 1) {
+                executeMoveToTableau(colIdx);
+            } else {
+                selected = { source: 'tableau', colIndex: colIdx, cardIndex: cardIdx };
+                render();
+            }
+        }
+
+        function clickEmptyColumn(colIdx) {
+            if (!selected || tableau[colIdx].length > 0) return;
+            const movingCard = selected.source === 'waste' 
+                ? waste[waste.length - 1] 
+                : tableau[selected.colIndex][selected.cardIndex];
+
+            if (movingCard.rank === 13) { // Hanya King (K)
+                executeMoveToTableau(colIdx);
+            }
+        }
+
+        function executeMoveToTableau(targetCol) {
+            if (selected.source === 'waste') {
+                tableau[targetCol].push(waste.pop());
+            } else {
+                const movedCards = tableau[selected.colIndex].splice(selected.cardIndex);
+                tableau[targetCol].push(...movedCards);
+                flipTopCard(selected.colIndex);
+            }
+            score += 10;
+            moves++;
+            selected = null;
+            render();
+        }
+
+        function clickFoundation(suitIdx) {
+            if (!selected) return;
+            const movingCard = selected.source === 'waste' 
+                ? waste[waste.length - 1] 
+                : (selected.cardIndex === tableau[selected.colIndex].length - 1 ? tableau[selected.colIndex][selected.cardIndex] : null);
+
+            if (!movingCard || movingCard.suitIndex !== suitIdx) return;
+
+            const pile = foundations[suitIdx];
+            if (movingCard.rank === pile.length + 1) {
+                if (selected.source === 'waste') {
+                    pile.push(waste.pop());
+                } else {
+                    pile.push(tableau[selected.colIndex].pop());
+                    flipTopCard(selected.colIndex);
+                }
+                score += 25;
+                moves++;
+                selected = null;
+                render();
+            }
+        }
+
+        function autoSendToFoundation(card, source, colIdx = null) {
+            const pile = foundations[card.suitIndex];
+            if (card.rank === pile.length + 1) {
+                if (source === 'waste') waste.pop();
+                else {
+                    tableau[colIdx].pop();
+                    flipTopCard(colIdx);
+                }
+                pile.push(card);
+                score += 25;
+                moves++;
+                selected = null;
+                render();
+                return true;
+     
