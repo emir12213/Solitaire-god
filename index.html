@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Solitaire: God Mode Edition</title>
+  
+  <!-- Link Manifest & App Icons -->
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+
+  <style>
+    /* =========================================
+       FIGMA-INSPIRED DESIGN SYSTEM & TOKENS
+       ========================================= */
+    :root {
+      --bg-gradient: radial-gradient(circle at 50% 0%, #1e293b 0%, #090d16 100%);
+      --glass-bg: rgba(255, 255, 255, 0.06);
+      --glass-border: rgba(255, 255, 255, 0.12);
+      --gold-primary: #f59e0b;
+      --gold-glow: 0 0 15px rgba(245, 158, 11, 0.5);
+      --card-bg: #ffffff;
+      --card-back: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%);
+      --red-suit: #ef4444;
+      --black-suit: #0f172a;
+      --card-radius: 10px;
+      --card-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body {
+      background: var(--bg-gradient);
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* HEADER / TOP BAR */
+    .navbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-god {
+      background: linear-gradient(90deg, #f59e0b, #fbbf24);
+      color: #000;
+      font-size: 10px;
+      font-weight: 900;
+      padding: 3px 8px;
+      border-radius: 20px;
+      box-shadow: var(--gold-glow);
+      text-transform: uppercase;
+    }
+
+    .stats {
+      display: flex;
+      gap: 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #cbd5e1;
+    }
+
+    /* GOD MODE CONTROL PANEL */
+    .god-panel {
+      display: flex;
+      gap: 8px;
+      padding: 10px 14px;
+      overflow-x: auto;
+      background: rgba(245, 158, 11, 0.08);
+      border-bottom: 1px solid rgba(245, 158, 11, 0.25);
+    }
+
+    .btn-god {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(245, 158, 11, 0.5);
+      color: #fbbf24;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+
+    .btn-god:active {
+      transform: scale(0.95);
+    }
+
+    .btn-god.active {
+      background: #f59e0b;
+      color: #090d16;
+      box-shadow: var(--gold-glow);
+    }
+
+    /* GAME BOARD */
+    .board {
+      flex: 1;
+      max-width: 900px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 14px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .top-row {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+    }
+
+    .tableau-row {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+      flex: 1;
+    }
+
+    /* CARD SLOTS */
+    .slot {
+      aspect-ratio: 2.5 / 3.5;
+      border-radius: var(--card-radius);
+      border: 1.5px dashed rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.03);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: rgba(255, 255, 255, 0.2);
+    }
+
+    .tableau-col {
+      position: relative;
+      min-height: 320px;
+    }
+
+    /* PLAYING CARD COMPONENT */
+    .card {
+      width: 100%;
+      aspect-ratio: 2.5 / 3.5;
+      border-radius: var(--card-radius);
+      background: var(--card-bg);
+      box-shadow: var(--card-shadow);
+      position: absolute;
+      left: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 5px;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      border: 1px solid #e2e8f0;
+    }
+
+    .card.red { color: var(--red-suit); }
+    .card.black { color: var(--black-suit); }
+
+    .card.selected {
+      transform: translateY(-6px) scale(1.03);
+      box-shadow: 0 0 0 3px #f59e0b, 0 12px 24px rgba(0,0,0,0.6);
+      z-index: 99 !important;
+    }
+
+    /* CARD BACK & X-RAY GOD MODE */
+    .card.facedown {
+      background: var(--card-back);
+      border: 1.5px solid rgba(255, 255, 255, 0.25);
+    }
+
+    .card.facedown .card-inner {
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+
+    body.xray-on .card.facedown {
+      background: rgba(30, 27, 75, 0.85);
+      border: 1.5px dashed #fbbf24;
+    }
+
+    body.xray-on .card.facedown .card-inner {
+      opacity: 0.55;
+      filter: grayscale(0.2);
+    }
+
+    .card-top {
+      font-size: clamp(11px, 2.8vw, 16px);
+      font-weight: 800;
+      line-height: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .card-center {
+      font-size: clamp(18px, 4.5vw, 30px);
+      text-align: center;
+      line-height: 1;
+    }
+
+    .card-bottom {
+      font-size: clamp(11px, 2.8vw, 16px);
+      font-weight: 800;
+      line-height: 1;
+      transform: rotate(180deg);
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    /* WIN MODAL */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(9, 13, 22, 0.85);
+      backdrop-filter: blur(10px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      padding: 20px;
+    }
+
+    .modal-card {
+      background: #1e293b;
+      border: 1px solid #f59e0b;
+      border-radius: 20px;
+      padding: 28px;
+      text-align: center;
+      max-width: 340px;
+      width: 100%;
+      box-shadow: var(--gold-glow);
+    }
+
+    .modal-card h2 {
+      color: #fbbf24;
+      margin-bottom: 8px;
+      font-size: 24px;
+    }
+
+    .modal-card p {
+      color: #cbd5e1;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(90deg, #f59e0b, #fbbf24);
+      color: #090d16;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-weight: 800;
+      font-size: 14px;
+      cursor: pointer;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP NAVBAR -->
+  <header class="navbar">
+    <div class="brand">
+      <span>SOLITAIRE</span>
+      <span class="badge-god">⚡ GOD MODE</span>
+    </div>
+    <div class="stats">
+      <span>Skor: <b id="score">0</b></span>
+      <span>Langkah: <b id="moves">0</b></span>
+    </div>
+  </header>
+
+  <!-- GOD MODE TOOLBAR -->
+  <div class="god-panel">
+    <button class="btn-god" onclick="newGame()">🔄 Game Baru</button>
+    <button class="btn-god" onclick="undoMove()">↩️ Undo</button>
+    <button class="btn-god" id="btnXray" onclick="toggleXray()">👁️ X-Ray: OFF</button>
+    <button class="btn-god" id="btnAnyMove" onclick="toggleAnyMove()">🪄 Bebas Pindah: OFF</button>
+    <button class="btn-god" onclick="godAutoWin()">👑 Auto Win</button>
+  </div>
+
+  <!-- GAME ARENA -->
+  <main class="board">
+    <!-- TOP ROW: STOCK, WASTE, & 4 FOUNDATIONS -->
+    <div class="top-row">
+      <div class="slot" id="stock" onclick="drawStock()">↻</div>
+      <div class="slot" id="waste"></div>
+      <div></div> <!-- Spacer -->
+      <div class="slot foundation" data-suit="♠" onclick="clickFoundation(0)">♠</div>
+      <div class="slot foundation" data-suit="♥" onclick="clickFoundation(1)">♥</div>
+      <div class="slot foundation" data-suit="♣" onclick="clickFoundation(2)">♣</div>
+      <div class="slot foundation" data-suit="♦" onclick="clickFoundation(3)">♦</div>
+    </div>
+
+    <!-- TABLEAU 7 COLUMNS -->
+    <div class="tableau-row" id="tableau"></div>
+  </main>
+
+  <!-- VICTORY MODAL -->
+  <div class="modal" id="winModal">
+    <div class="modal-card">
+      <h2>👑 GODLIKE VICTORY!</h2>
+      <p>Semua kartu berhasil disusun dengan sempurna.</p>
+      <button class="btn-primary" onclick="newGame()">Main Lagi</button>
+    </div>
+  </div>
+
+  <!-- GAME ENGINE & PWA SERVICE WORKER -->
+  <script>
+    const SUITS = ['♠', '♥', '♣', '♦'];
+    const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    
+    let stock = [];
+    let waste = [];
+    let foundations = [[], [], [], []];
+    let tableau = [[], [], [], [], [], [], []];
+    let selected = null;
+    let score = 0;
+    let moves = 0;
+    let history = [];
+    let godAnyMove = false;
+
+    function isRed(suit) {
+      return suit === '♥' || suit === '♦';
+    }
+
+    function getValIndex(val) {
+      return VALUES.indexOf(val);
+    }
+
+    function saveHistory() {
+      history.push(JSON.stringify({ stock, waste, foundations, tableau, score, moves }));
+      if (history.length > 30) history.shift();
+    }
+
+    function undoMove() {
+      if (history.length === 0) return;
+      const prev = JSON.parse(history.pop());
+      stock = prev.stock;
+      waste = prev.waste;
+      foundations = prev.foundations;
+      tableau = prev.tableau;
+      score = prev.score;
+      moves = prev.moves;
+      selected = null;
+      render();
+    }
+
+    function toggleXray() {
+      document.body.classList.toggle('xray-on');
+      const btn = document.getElementById('btnXray');
+      const active = document.body.classList.contains('xray-on');
+      btn.textContent = active ? '👁️ X-Ray: ON' : '👁️ X-Ray: OFF';
+      btn.classList.toggle('active', active);
+    }
+
+    function toggleAnyMove() {
+      godAnyMove = !godAnyMove;
+      const btn = document.getElementById('btnAnyMove');
+      btn.textContent = godAnyMove ? '🪄 Bebas Pindah: ON' : '🪄 Bebas Pindah: OFF';
+      btn.classList.toggle('active', godAnyMove);
+    }
+
+    function godAutoWin() {
+      saveHistory();
+      const allCards = [];
+      stock.forEach(c => allCards.push(c));
+      waste.forEach(c => allCards.push(c));
+      tableau.forEach(col => col.forEach(c => allCards.push(c)));
+      foundations.forEach(f => f.forEach(c => allCards.push(c)));
+
+      stock = [];
+      waste = [];
+      tableau = [[], [], [], [], [], [], []];
+      foundations = [[], [], [], []];
+
+      SUITS.forEach((suit, sIdx) => {
+        VALUES.forEach(val => {
+          foundations[sIdx].push({ suit, val, faceUp: true });
+        });
+      });
+
+      score += 1000;
+      render();
+      checkWin();
+    }
+
+    function newGame() {
+      document.getElementById('winModal').style.display = 'none';
+      let deck = [];
+      for (let suit of SUITS) {
+        for (let val of VALUES) {
+          deck.push({ suit, val, faceUp: false });
+        }
+      }
+      // Shuffle
+      for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+      }
+
+      tableau = [[], [], [], [], [], [], []];
+      for (let c = 0; c < 7; c++) {
+        for (let r = 0; r <= c; r++) {
+          let card = deck.pop();
+          if (r === c) card.faceUp = true;
+          tableau[c].push(card);
+        }
+      }
+
+      stock = deck;
+      waste = [];
+      foundations = [[], [], [], []];
+      selected = null;
+      score = 0;
+      moves = 0;
+      history = [];
+      render();
+    }
+
+    function drawStock() {
+      saveHistory();
+      selected = null;
+      if (stock.length > 0) {
+        let card = stock.pop();
+        card.faceUp = true;
+        waste.push(card);
+      } else {
+        stock = waste.reverse().map(c => ({ ...c, faceUp: false }));
+        waste = [];
+      }
+      moves++;
+      render();
+    }
+
+    function canMoveToTableau(card, targetCol) {
+      if (godAnyMove) return true;
+      if (targetCol.length === 0) return card.val === 'K';
+      const topCard = targetCol[targetCol.length - 1];
+      if (!topCard.faceUp) return false;
+      const diffColor = isRed(card.suit) !== isRed(topCard.suit);
+      const oneLower = getValIndex(card.val) === getValIndex(topCard.val) - 1;
+      return diffColor && oneLower;
+    }
+
+    function canMoveToFoundation(card, fIdx) {
+      const pile = foundations[fIdx];
+      const targetSuit = SUITS[fIdx];
+      if (card.suit !== targetSuit) return false;
+      if (godAnyMove) return true;
+      if (pile.length === 0) return card.val === 'A';
+      const topCard = pile[pile.length - 1];
+      return getValIndex(card.val) === getValIndex(topCard.val) + 1;
+    }
+
+    function selectCard(source, colIdx, cardIdx) {
+      // Auto move on double click logic or second tap
+      if (selected && selected.source === source && selected.colIdx === colIdx && selected.cardIdx === cardIdx) {
+        // Try auto send to foundation
+        let card = getSelectedCards()[0];
+        if (getSelectedCards().length === 1) {
+          for (let f = 0; f < 4; f++) {
+            if (canMoveToFoundation(card, f)) {
+              moveSelectedToFoundation(f);
+              return;
+            }
+          }
+        }
+        selected = null;
+        render();
+        return;
+      }
+
+      // If already selected, try moving to this tableau column
+      if (selected && source === 'tableau') {
+        const movingCards = getSelectedCards();
+        if (canMoveToTableau(movingCards[0], tableau[colIdx])) {
+          moveSelectedToTableau(colIdx);
+          return;
+        }
+      }
+
+      selected = { source, colIdx, cardIdx };
+      render();
+    }
+
+    function getSelectedCards() {
+      if (!selected) return [];
+      if (selected.source === 'waste') return [waste[waste.length - 1]];
+      if (selected.source === 'tableau') {
+        return tableau[selected.colIdx].slice(selected.cardIdx);
+      }
+      return [];
+    }
+
+    function removeSelectedCards() {
+      if (selected.source === 'waste') {
+        waste.pop();
+      } else if (selected.source === 'tableau') {
+        tableau[selected.colIdx].splice(selected.cardIdx);
+        const col = tableau[selected.colIdx];
+        if (col.length > 0 && !col[col.length - 1].faceUp) {
+          col[col.length - 1].faceUp = true;
+          score += 5;
+        }
+      }
+    }
+
+    function moveSelectedToTableau(targetColIdx) {
+      saveHistory();
+      const cards = getSelectedCards();
+      removeSelectedCards();
+      tableau[targetColIdx].push(...cards);
+      selected = null;
+      moves++;
+      score += 10;
+      render();
+    }
+
+    function clickFoundation(fIdx) {
+      if (!selected) return;
+      const cards = getSelectedCards();
+      if (cards.length !== 1) return;
+      if (canMoveToFoundation(cards[0], fIdx)) {
+        moveSelectedToFoundation(fIdx);
+      }
+    }
+
+    function moveSelectedToFoundation(fIdx) {
+      saveHistory();
+      const cards = getSelectedCards();
+      removeSelectedCards();
+      foundations[fIdx].push(cards[0]);
+      selected = null;
+      moves++;
+      score += 25;
+      render();
+      checkWin();
+    }
+
+    function clickEmptyTableau(colIdx) {
+      if (!selected) return;
+      const cards = getSelectedCards();
+      if (canMoveToTableau(cards[0], tableau[colIdx])) {
+        moveSelectedToTableau(colIdx);
+      }
+    }
+
+    function checkWin() {
+      const total = foundations.reduce((acc, pile) => acc + pile.length, 0);
+      if (total === 52) {
+        document.getElementById('winModal').style.display = 'flex';
+      }
+    }
+
+    function createCardHTML(card, isSelected) {
+      const colorClass = isRed(card.suit) ? 'red' : 'black';
+      const faceClass = card.faceUp ? '' : 'facedown';
+      const selClass = isSelected ? 'selected' : '';
+      return `
+        <div class="card ${colorClass} ${faceClass} ${selClass}">
+          <div class="card-inner" style="height:100%; display:flex; flex-direction:column; justify-content:space-between;">
+            <div class="card-top"><span>${card.val}</span><span>${card.suit}</span></div>
+            <div class="card-center">${card.suit}</div>
+            <div class="card-bottom"><span>${card.val}</span><span>${card.suit}</span></div>
+          </div>
+        </div>
+      `;
+    }
+
+    function render() {
+      document.getElementById('score').textContent = score;
+      document.getElementById('moves').textContent = moves;
+
+      // Render Stock
+      const stockEl = document.getElementById('stock');
+      stockEl.innerHTML = stock.length > 0 
+        ? `<div class="card facedown" style="position:relative;"><div class="card-inner"></div></div>` 
+        : '↻';
+
+      // Render Waste
+      const wasteEl = document.getElementById('waste');
+      wasteEl.innerHTML = '';
+      if (waste.length > 0) {
+        const topWaste = waste[waste.length - 1];
+        const isSel = selected && selected.source === 'waste';
+        wasteEl.innerHTML = createCardHTML(topWaste, isSel);
+        wasteEl.firstElementChild.onclick = () => selectCard('waste', 0, waste.length - 1);
+      }
+
+      // Render Foundations
+      const fEls = document.querySelectorAll('.foundation');
+      fEls.forEach((el, idx) => {
+        const pile = foundations[idx];
+        if (pile.length > 0) {
+          el.innerHTML = createCardHTML(pile[pile.length - 1], false);
+        } else {
+          el.innerHTML = SUITS[idx];
+        }
+      });
+
+      // Render Tableau
+      const tabEl = document.getElementById('tableau');
+      tabEl.innerHTML = '';
+      tableau.forEach((col, cIdx) => {
+        const colDiv = document.createElement('div');
+        colDiv.className = 'tableau-col';
+        if (col.length === 0) {
+          colDiv.innerHTML = `<div class="slot" onclick="clickEmptyTableau(${cIdx})"></div>`;
+        } else {
+          col.forEach((card, rIdx) => {
+            const isSel = selected && selected.source === 'tableau' && selected.colIdx === cIdx && rIdx >= selected.cardIdx;
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = createCardHTML(card, isSel);
+            const cardNode = wrapper.firstElementChild;
+            cardNode.style.top = `${rIdx * 24}px`;
+            cardNode.style.zIndex = rIdx + 1;
+            if (card.faceUp) {
+              cardNode.onclick = (e) => {
+                e.stopPropagation();
+                selectCard('tableau', cIdx, rIdx);
+              };
+            }
+            colDiv.appendChild(cardNode);
+          });
+        }
+        tabEl.appendChild(colDiv);
+      });
+    }
+
+    // Start Game
+    newGame();
+
+    // REGISTER SERVICE WORKER FOR PWA / APK BUILD
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('SW Registered:', reg.scope))
+          .catch(err => console.error('SW Failed:', err));
+      });
+    }
+  </script>
+</body>
+</html>
